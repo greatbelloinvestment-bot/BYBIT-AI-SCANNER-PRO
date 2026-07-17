@@ -2,11 +2,22 @@
 # BYBIT AI SCANNER PRO V3
 # MAIN SCANNER
 # ==========================================
+# ==========================================
+# BYBIT AI SCANNER PRO V3.2
+# MAIN SCANNER
+# ==========================================
 
 from config import SYMBOLS
+
 from market import get_klines, prepare_dataframe
 from indicators import calculate_indicators
 from strategy import get_signal
+
+from multi_timeframe import multi_timeframe_analysis
+from risk import calculate_risk
+from ai_engine import calculate_ai_score
+from ranking import rank_trade
+from report import print_trade
 
 print("\n" + "=" * 80)
 print("🏦 BYBIT AI SCANNER PRO V3")
@@ -29,6 +40,34 @@ for symbol in SYMBOLS:
         df = calculate_indicators(df)
 
         trade = get_signal(df)
+
+        # Multi-Timeframe Analysis
+        mtf = multi_timeframe_analysis(symbol)
+
+        # Risk Analysis
+        risk = calculate_risk(
+          trade["entry"],
+          trade["stop"],
+          trade["tp1"]
+        )
+
+        # AI Score
+        ai = calculate_ai_score(
+          trade,
+          mtf,
+           risk
+        )
+
+        # Update trade confidence
+        trade["confidence"] = ai["confidence"]
+        trade["grade"] = ai["grade"]
+
+        # Add risk values
+        trade.update(risk)
+
+        # Add timeframe data
+        if mtf:
+          trade.update(mtf)
 
         results.append({
             "symbol": symbol,

@@ -1,6 +1,6 @@
 # ==========================================
-# BYBIT AI SCANNER PRO V3
-# MARKET DATA
+# BYBIT AI SCANNER PRO V3.1
+# MARKET DATA ENGINE
 # ==========================================
 
 from pybit.unified_trading import HTTP
@@ -27,16 +27,21 @@ session = HTTP(
 # GET KLINES
 # ==========================================
 
-def get_klines(symbol):
+def get_klines(symbol, interval=None):
+
+    # Use default interval from config if none is supplied
+    if interval is None:
+        interval = INTERVAL
 
     response = session.get_kline(
         category="linear",
         symbol=symbol,
-        interval=INTERVAL,
+        interval=interval,
         limit=LIMIT
     )
 
     return response
+
 
 # ==========================================
 # PREPARE DATAFRAME
@@ -44,9 +49,12 @@ def get_klines(symbol):
 
 def prepare_dataframe(response):
 
-    candles = response["result"]["list"]
+    try:
+        candles = response["result"]["list"]
+    except (KeyError, TypeError):
+        return pd.DataFrame()
 
-    if len(candles) == 0:
+    if not candles:
         return pd.DataFrame()
 
     df = pd.DataFrame(
@@ -62,6 +70,7 @@ def prepare_dataframe(response):
         ]
     )
 
+    # Convert numeric columns
     numeric_columns = [
         "open",
         "high",
@@ -72,14 +81,15 @@ def prepare_dataframe(response):
     ]
 
     for col in numeric_columns:
-        df[col] = pd.to_numeric(df[col])
+        df[col] = pd.to_numeric(df[col], errors="coerce")
 
+    # Convert timestamp
     df["timestamp"] = pd.to_datetime(
-        df["timestamp"].astype(int),
+        df["timestamp"].astype("int64"),
         unit="ms"
     )
 
-    # Oldest candle first
-    df = df.iloc[::-1].reset_index(drop=True)
+    # Sort oldest → newest
+    df = df.sort_values("timestamp").reset_index(drop=True)
 
     return df

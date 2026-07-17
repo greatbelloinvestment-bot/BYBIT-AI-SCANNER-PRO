@@ -2,64 +2,144 @@
 # BYBIT AI SCANNER PRO V4
 # INSTITUTIONAL AI ENGINE
 # ==========================================
+from bos import detect_bos
+from choch import detect_choch
 
-def analyze_institutional_ai(df, trend, smart_money):
+def calculate_institutional_score(
+    df,
+    trade,
+    mtf,
+    risk
+):
+    """
+    Returns:
+        score (0-100)
+        grade
+        reasons
+    """
 
     score = 0
     reasons = []
 
-    institutional_confidence = 0
-
-    # ===============================
-    # Trend Analysis (40 points)
-    # ===============================
-
-    if trend["trend"] == "BULLISH":
-        score += 40
-        institutional_confidence += 40
-        reasons.append("Strong Bullish Trend")
-
-    elif trend["trend"] == "BEARISH":
-        score += 40
-        institutional_confidence += 40
-        reasons.append("Strong Bearish Trend")
-
-    # ===============================
-    # Smart Money (30 points)
-    # ===============================
-
-    if smart_money["score"] >= 70:
-        score += 30
-        institutional_confidence += 30
-        reasons.append("Institutional Buying Activity")
-
-    elif smart_money["score"] >= 40:
-        score += 15
-        institutional_confidence += 15
-        reasons.append("Moderate Smart Money")
-
-    # ===============================
-    # Volume Confirmation (20 points)
-    # ===============================
-
     last = df.iloc[-1]
 
-    if last["volume"] > last["VOL_MA"]:
+    # ======================================
+    # TREND (25)
+    # ======================================
+
+    if last["EMA20"] > last["EMA50"] > last["EMA200"]:
+        score += 25
+        reasons.append("Strong Bullish Trend")
+
+    elif last["EMA20"] < last["EMA50"] < last["EMA200"]:
         score += 20
-        institutional_confidence += 20
-        reasons.append("High Volume Confirmation")
+        reasons.append("Strong Bearish Trend")
 
-    # ===============================
-    # ADX Confirmation (10 points)
-    # ===============================
+    # ======================================
+    # MOMENTUM (20)
+    # ======================================
 
-    if last["ADX"] > 25:
+    if last["MACD"] > last["MACD_SIGNAL"]:
+        score += 20
+        reasons.append("MACD Bullish")
+
+    elif last["MACD"] < last["MACD_SIGNAL"]:
+        score += 15
+        reasons.append("MACD Bearish")
+
+    # ======================================
+    # VOLUME (15)
+    # ======================================
+
+    if last["volume"] > last["VOL_MA"]:
+        score += 15
+        reasons.append("High Volume")
+
+    else:
+        score += 5
+        reasons.append("Low Volume")
+
+    # ======================================
+    # RISK (10)
+    # ======================================
+
+    rr = risk["risk_reward"]
+
+    if rr >= 3:
         score += 10
-        institutional_confidence += 10
-        reasons.append("Strong Trend Strength")
+        reasons.append("Excellent Risk Reward")
+
+    elif rr >= 2:
+        score += 8
+        reasons.append("Good Risk Reward")
+
+    elif rr >= 1.5:
+        score += 5
+        reasons.append("Acceptable Risk Reward")
+
+    # ======================================
+    # MULTI TIMEFRAME (15)
+    # ======================================
+
+    if mtf:
+
+        if mtf["confidence"] >= 90:
+            score += 15
+            reasons.append("Perfect MTF Alignment")
+
+        elif mtf["confidence"] >= 60:
+            score += 10
+            reasons.append("Good MTF Alignment")
+
+    # ======================================
+    # SMART MONEY (15)
+    # ======================================
+
+    bos = detect_bos(df)
+    choch = detect_choch(df)
+
+    # BOS
+    if bos["bos"]:
+      score += 10
+      reasons.extend(bos["reasons"])
+    else:
+      reasons.append("No BOS Confirmed")
+
+    # CHOCH
+    if choch["choch"]:
+      score += 5
+      reasons.extend(choch["reasons"])
+    else:
+      reasons.append("No CHOCH Detected")
+
+    # ======================================
+    # FINAL SCORE
+    # ======================================
+
+    score = max(0, min(score, 100))
+
+    if score >= 95:
+        grade = "A+"
+
+    elif score >= 90:
+        grade = "A"
+
+    elif score >= 80:
+        grade = "B+"
+
+    elif score >= 70:
+        grade = "B"
+
+    elif score >= 60:
+        grade = "C"
+
+    else:
+        grade = "D"
 
     return {
-        "score": score,
-        "confidence": institutional_confidence,
-        "reasons": reasons
-    }
+    "score": score,
+    "grade": grade,
+    "reasons": reasons,
+    "bos": bos,
+    "choch": choch
+}
